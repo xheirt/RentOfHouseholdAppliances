@@ -1,0 +1,4 @@
+WashingMachine Samsung 2021 white 123456 20.0
+Holodilnik LG 2022 gray 789012 25.0
+Posydamoishnayamachine Bosch 2020 super_gray 654321 18.0
+Mikrovolnovka Panasonic 2023 black 987654 15.0

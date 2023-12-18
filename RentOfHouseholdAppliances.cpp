@@ -1,7 +1,10 @@
 ﻿#include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <locale>
+#include <iomanip>
 
 using namespace std;
 
@@ -14,6 +17,8 @@ public:
     RentableItem(string name, string manufacturer, int year, string color, int inventoryNumber, double rentalPrice)
         : name(name), manufacturer(manufacturer), year(year), color(color), inventoryNumber(inventoryNumber), rentalPrice(rentalPrice){}
 
+    RentableItem() = default;
+
     virtual ~RentableItem(){}
     
     virtual double calculateRentalRevenue(int rentalPeriod) const {
@@ -21,18 +26,30 @@ public:
     }
 
     virtual void displayInformation() const {
-        cout << "Предмет БТ: " << name << "\nПроизводитель БТ: " << manufacturer << "\nГод выпуска: " << year
-            << "\nЦвет предмета: " << color << "\nИнвентарный номер: " << inventoryNumber
-            << "\nЦена аренды: " << rentalPrice << " за один день\n\n";
+        cout << "|" << std::setw(25) << name << "|"
+            << std::setw(20) << manufacturer << "|"
+            << std::setw(8) << year << "|"
+            << std::setw(15) << color << "|"
+            << std::setw(15) << inventoryNumber << "|"
+            << std::setw(10) << std::fixed << std::setprecision(2) << rentalPrice << "|"
+            << "\n|-------------------------|--------------------|--------|---------------|---------------|----------|";
     }
 
     int getInventoryNumber() const {
         return inventoryNumber;
     }
 
+    int getRentalPeriod() const {
+        return rentalPeriod;
+    }
+    // Добавим перегрузку оператора '<' для сравнения предметов БТ по сроку аренды
+    bool operator<(const RentableItem& other) const {
+        return rentalPeriod < other.rentalPeriod;
+    }   
+
 private:
     string name, manufacturer, color;
-    int year, inventoryNumber;
+    int year, inventoryNumber, rentalPeriod;
     double rentalPrice;
 };
 
@@ -45,7 +62,6 @@ public:
     HomeAppliance(string name, string manufacturer, int year, string color, int inventoryNumber, double rentalPrice)
         : RentableItem(name, manufacturer, year, color, inventoryNumber, rentalPrice){}
     
-    // Дополнительные характеристики и функциональность для бытовой техники для дома
 };
 
 //              ╔═════════════════════════════╗
@@ -100,17 +116,23 @@ public:
     // Дополнительные характеристики и функциональность для юридического лица
 };
 
+//              ╔═════════════════════════════╗
+//              ║        Центр проката        ║
+//              ╚═════════════════════════════╝
+
 class RentalCenter {
 public:
+
+//-----------Проверка наличия предмета БТ в центре-----------\\
+
     void rentItem(RentableItem* item, Client* client, int rentalPeriod) {
-        // Проверка наличия предмета БТ в центре
         auto it = find_if(rentedItems.begin(), rentedItems.end(),
             [item](const pair<RentableItem*, int>& pair) {
                 return pair.first->getInventoryNumber() == item->getInventoryNumber();
             });
 
         if (it == rentedItems.end()) {
-            // Предмет не найден в списке арендованных, можно арендовать
+            // если предмет не арендован
             rentedItems.push_back(make_pair(item, rentalPeriod));
             clients.push_back(client);
             //cout << "Товар успешно сдан в аренду!\n";
@@ -121,26 +143,46 @@ public:
     }
 
     void returnItem(RentableItem* item, int actualRentalPeriod) {
+
+//---------Ищем арендованный предмет по инвентарному номеру---------\\
+
         auto it = find_if(rentedItems.begin(), rentedItems.end(),
             [item](const pair<RentableItem*, int>& pair) {
                 return pair.first->getInventoryNumber() == item->getInventoryNumber();
             });
 
+        //если предмет найден в списке аренды
         if (it != rentedItems.end()) {
+            //рассчитываем доход от аренды без штрафа
             double rentalRevenue = it->first->calculateRentalRevenue(it->second);
             double penalty = 0.0;
 
             // Проверка на превышение времени аренды
+
             if (actualRentalPeriod > it->second) {
+                // Рассчитываем штраф как удвоенную стоимость аренды за каждый лишний день
                 penalty = (actualRentalPeriod - it->second) * (2 * it->first->calculateRentalRevenue(1));
             }
 
+            // Рассчитываем общий доход
             double totalRevenue = rentalRevenue + penalty;
 
             cout << "Товар успешно возвращен!\n";
             cout << "Доход от аренды: " << rentalRevenue << "\nШтраф: " << penalty << "\nОбщий доход: " << totalRevenue << "\n";
 
-            // Удаляем предмет из списка арендованных
+            // Здесь можно добавить возможность продления аренды
+            char extendRent;
+            cout << "Хотите продлить аренду? (y/n): ";
+            cin >> extendRent;
+
+            if (extendRent == 'y' || extendRent == 'Y') {
+                int additionalDays;
+                cout << "Введите количество дополнительных дней аренды: ";
+                cin >> additionalDays;
+                it->second += additionalDays;
+                cout << "Аренда успешно продлена на " << additionalDays << " дней.\n";
+            }
+
             rentedItems.erase(it);
         }
         else {
@@ -162,66 +204,74 @@ public:
         return totalRevenue;
     }
 
-    vector<RentableItem*> insufficientItems() const {
-        // Предположим, что это список предметов, которых не хватает в центре
-        // Вам, возможно, нужно предоставить конкретную логику для этой функции
-        std::vector<RentableItem*> insufficientItemsList;
-
-        // Пример: добавим элементы, если количество арендованных элементов превышает определенное значение
-        for (const auto& pair : rentedItems) {
-            if (pair.second > 10) {
-                insufficientItemsList.push_back(pair.first);
-            }
-        }
-
-        return insufficientItemsList;
-    }
-
 private:
     vector<pair<RentableItem*, int>> rentedItems; // Предмет аренды и срок аренды
     vector<Client*> clients;                      // Список клиентов
 };
 
-enum MenuOption {
-    SHOW_RENTED_ITEMS,
-    SHOW_TOTAL_REVENUE,
-    EXIT
-};
 
-void displayMenu() {
-    cout << "Меню:\n"
-         << "0. Показать арендованные предметы\n"
-         << "1. Показать общую сумму\n"
-         << "2. Выход\n";
-}
 
-void processMenuOption(RentalCenter& rentalCenter, MenuOption option) {
-    switch (option) {
-    case SHOW_RENTED_ITEMS: {
-        // Показать арендованные предметы
-        cout << "\nАрендованные предметы:\n" << "\n-------------------------\n";
-        for (const auto& pair : rentalCenter.getRentedItems()) {
-            pair.first->displayInformation();
-            cout << "Срок аренды: " << pair.second << " дней\n";
-            cout << "-------------------------\n";
+
+
+
+// Пример сохранения и загрузки данных
+template <typename T>
+void saveData(const std::vector<T>& data, const std::string& filename) {
+    std::ofstream file(filename, std::ios::out | std::ios::binary);
+    if (file.is_open()) {
+        for (const auto& item : data) {
+            file << item;
         }
-        break;
+        file.close();
     }
-    
-    case SHOW_TOTAL_REVENUE: {
-        // Показать общую выручку
-        double totalRevenue = rentalCenter.calculateTotalRevenue();
-        cout << "Общий доход: " << totalRevenue << "\n";
-        break;
-    }
-
-    case EXIT:
-        cout << "Exiting the program.\n";
-        break;
-    default:
-        cout << "Invalid option.\n";
+    else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
     }
 }
+
+template <typename T>
+void loadData(std::vector<T>& data, const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (file.is_open()) {
+        while (!file.eof()) {
+            T item;
+            file >> item;
+            data.push_back(item);
+        }
+        file.close();
+    }
+    else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
+    }
+}
+
+
+//ищет предмет по инвентарному номеру в списке арендованных предметов
+RentableItem* findItemByInventoryNumber(RentalCenter& rentalCenter, int inventoryNumber) {
+    for (const auto& pair : rentalCenter.getRentedItems()) {
+        if (pair.first->getInventoryNumber() == inventoryNumber) {
+            return pair.first;
+        }
+    }
+    return nullptr;
+}
+
+RentableItem* findItemByInventoryNumberForRent(RentalCenter& rentalCenter, int inventoryNumber) {
+    // Поиск предмета в центре БТ, который не находится в аренде
+    // Здесь вам нужно реализовать логику поиска предмета для аренды
+    // Может быть, у вас есть вектор всех предметов в центре, и вы исключаете из него те, которые уже арендованы
+    // Это зависит от структуры вашего приложения
+    // Пример:
+    for (const auto& pair : rentalCenter.getRentedItems()) {
+        if (pair.first->getInventoryNumber() == inventoryNumber) {
+            return nullptr; // Предмет уже в аренде
+        }
+    }
+
+    // Возвращает предмет, который можно арендовать
+    return findItemByInventoryNumber(rentalCenter, inventoryNumber);
+}
+
 
 int main()
 {
@@ -229,54 +279,61 @@ int main()
 
     RentalCenter rentalC;
 
-    HomeAppliance homeA("Стиральная машина", "Samsung", 2021, "Белый", 123456, 20.0);
-    OrganizationAppliance orgA("Проектор", "Epson", 2020, "Черный", 789012, 30.0);
-/*
-    homeA.displayInformation();
-    cout << "Выручка от аренды: " << homeA.calculateRentalRevenue(5) << "\n\n";
+    vector<RentableItem> rentableItems;
 
-    orgA.displayInformation();
-    cout << "Выручка от аренды: " << orgA.calculateRentalRevenue(3) << "\n\n";
-    */
+    ofstream outputFile("data.txt");
+    if (outputFile.is_open()) {
+        outputFile << "WashingMachine Samsung 2021 white 123456 20.0\n";
+        outputFile << "Holodilnik LG 2022 gray 789012 25.0\n";
+        outputFile << "Posydamoishnayamachine Bosch 2020 super_gray 654321 18.0\n";
+        outputFile << "Mikrovolnovka Panasonic 2023 black 987654 15.0\n";
+
+        outputFile.close();
+    }
+    else {
+        cout << "Не удалось открыть файл для записи" << endl;
+    }
+
+    
+    ifstream inputFile("data.txt");
+    if (inputFile.is_open()) {
+        string name, manufacturer, color;
+        int year, inventoryNumber;
+        double rentalPrice;
+
+        cout << "Предмет БТ |Производитель БТ|Год|Цвет предмета|Инвентарный номер|Цена за 1 день|" << endl;
+        while (inputFile >> name >> manufacturer >> year >> color >> inventoryNumber >> rentalPrice) {
+            HomeAppliance appliance(name, manufacturer, year, color, inventoryNumber, rentalPrice);
+            appliance.displayInformation();
+            cout << endl;  // добавьте переход на новую строку между объектами
+        }
+
+        inputFile.close();
+    }
+    else {
+        cout << "Не удалось открыть файл для чтения" << endl;
+    }
+   
+
+    //rentableItems.emplace_back("Washing Machine", "Samsung", 2022, "White", 123456, 20.0);
+    //rentableItems.emplace_back("Projector", "Epson", 2021, "Black", 789012, 30.0);
+    //saveData(rentableItems, "Товары.txt");
+    /*
+    HomeAppliance homeA("Стиральная машина", "Samsung", 2021, "Белый", 123456, 20.0);
+    HomeAppliance homeB("Холодильник", "LG", 2022, "Серый", 789012, 25.0);
+    HomeAppliance homeC("Посудомоечная машина", "Bosch", 2020, "Серебристый", 654321, 18.0);
+    HomeAppliance homeD("Микроволновая печь", "Panasonic", 2023, "Черный", 987654, 15.0);
+
+    OrganizationAppliance orgA("Проектор", "Epson", 2020, "Черный", 789012, 30.0);
+
     IndividualClient individualClient("Вадим Жолудев");
+    IndividualClient individualClient1("Кирилл Лазарев");
     CorporateClient corporateClient("IV Company");
 
     rentalC.rentItem(&homeA, &individualClient, 7);
     rentalC.rentItem(&orgA, &corporateClient, 5);
-
-    /*
-    rentalC.returnItem(&homeA, 8);
-    rentalC.returnItem(&orgA, 5);
-    
-    // Дополнительные примеры использования
-    RentableItem* mostDemanded = rentalC.mostDemandedItem();
-    if (mostDemanded) {
-        std::cout << "Most demanded item: ";
-        mostDemanded->displayInformation();
-    }
-
-    double totalRevenue = rentalC.calculateTotalRevenue();
-    std::cout << "Total Revenue: " << totalRevenue << "\n";
-
-    std::vector<RentableItem*> insufficientItemsList = rentalC.insufficientItems();
-    std::cout << "Insufficient Items:\n";
-    for (const auto& item : insufficientItemsList) {
-        item->displayInformation();
-    }*/
-
-    MenuOption option = EXIT;
-    do {
-        displayMenu();
-        cout << "Выберите опцию (0-2): ";
-        int choice;
-        cin >> choice;
-
-        option = static_cast<MenuOption>(choice);
-
-        processMenuOption(rentalC, option);
-
-    } while (option != EXIT);
-
+    rentalC.rentItem(&homeD, &individualClient, 22);
+    */
     system("pause");
     return 0;
 }
